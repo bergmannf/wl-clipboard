@@ -35,6 +35,7 @@
 #include <libgen.h>
 #include <getopt.h>
 #include <signal.h>
+#include <sys/stat.h>
 
 static struct {
     int stay_in_foreground;
@@ -46,6 +47,15 @@ static struct {
     int sensitive;
     const char *seat_name;
 } options;
+
+int is_fd_pipe(int fd) {
+    struct stat st;
+    if (fstat(fd, &st) == -1) {
+        perror("fstat failed");
+        return -1; // Error
+    }
+    return S_ISFIFO(st.st_mode);
+}
 
 static void did_set_selection_callback(struct copy_action *copy_action) {
     if (options.clear) {
@@ -67,6 +77,9 @@ static void did_set_selection_callback(struct copy_action *copy_action) {
         if (devnull >= 0) {
             dup2(devnull, STDOUT_FILENO);
             dup2(devnull, STDIN_FILENO);
+            if (is_fd_pipe(STDERR_FILENO) == 1) {
+                dup2(devnull, STDERR_FILENO);
+            }
             close(devnull);
         } else {
             /* If we cannot open /dev/null,
